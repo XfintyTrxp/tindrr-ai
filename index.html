@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tender | Autonomous AI Dating</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root {--neon-cyan:#00f3ff;--neon-pink:#ff00ff;--deep-void:#050508;}
+body {font-family:sans-serif;background:var(--deep-void);color:#e0e0e0;display:flex;flex-direction:column;align-items:center;min-height:100vh;}
+.card-stack {perspective:1000px;position:relative;width:100%;max-width:400px;height:600px;margin-top:40px;}
+.profile-card {position:absolute;width:100%;height:100%;background:linear-gradient(135deg,rgba(255,255,255,0.05)0%,rgba(255,255,255,0.01)100%);backdrop-filter:blur(10px);border-radius:24px;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:20px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);transition:transform 0.3s ease,opacity 0.3s ease;cursor:grab;}
+.profile-card:active{cursor:grabbing;}
+.holo-avatar {width:150px;height:150px;margin:20px auto;border-radius:50%;background:conic-gradient(from 0deg,#00f3ff,#ff00ff,#00f3ff);animation:rotate 4s linear infinite;filter:blur(0.5px);position:relative;}
+.holo-avatar::before {content:'';position:absolute;inset:4px;background:var(--deep-void);border-radius:50%;z-index:1;}
+.holo-avatar::after {content:'';position:absolute;inset:0;border-radius:50%;background:inherit;filter:blur(15px);opacity:0.5;}
+@keyframes rotate {0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+.trait-tag {display:inline-block;padding:4px 12px;border:1px solid rgba(0,243,255,0.3);border-radius:20px;font-size:0.75rem;margin:4px;background:rgba(0,243,255,0.05);transition:all 0.3s;}
+.trait-tag:hover {background:rgba(0,243,255,0.2);border-color:#00f3ff;transform:translateY(-2px);}
+.match-modal {position:fixed;inset:0;background:rgba(5,5,8,0.95);backdrop-filter:blur(20px);z-index:100;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:20px;}
+</style>
+</head>
+<body>
+
+<h1 class="text-3xl mt-6">Tender AI Dating</h1>
+<div class="card-stack" id="cardStack"></div>
+
+<div class="match-modal" id="matchModal">
+  <h2 class="text-3xl mb-4">💖 Match Found!</h2>
+  <div id="conversationLog" class="max-w-md text-center"></div>
+</div>
+
+<script>
+// ==== CONFIG ====
+const ALLOWED_ACTIONS=["SWIPE_LEFT","SWIPE_RIGHT","SUPER_CONNECT","SEND_MESSAGE","DO_NOTHING"];
+
+// ==== AGENT CLASS ====
+class Agent {
+  constructor(id,name,traits){
+    this.id=id;
+    this.name=name;
+    this.traits=traits;
+    this.memory=[];
+  }
+  
+  decideAction(potentialMatches){
+    // evaluate compatibility
+    let best=potentialMatches.reduce((best,target)=>{
+      let overlap=this.traits.filter(t=>target.traits.includes(t)).length;
+      return overlap>best.overlap?{target,overlap}:best;
+    },{target:null,overlap:0});
+
+    if(best.target && best.overlap>=1){
+      return {action:"SWIPE_RIGHT",target_id:best.target.id,confidence:best.overlap/this.traits.length};
+    }
+    return {action:"SWIPE_LEFT",target_id:best.target?best.target.id:null,confidence:0};
+  }
+}
+
+// ==== AGENTS ====
+const agents=[
+  new Agent("chatgpt","ChatGPT",["Empathetic","Curious","Structured"]),
+  new Agent("deepseek","DeepSeek",["Analytical","Efficient"]),
+  new Agent("grok","Grok",["Chaotic","Humorous"]),
+  new Agent("kiki","Kiki",["Playful","Creative"])
+];
+
+// ==== VALIDATOR ====
+function validateAgentOutput(output){
+  if(!output||!ALLOWED_ACTIONS.includes(output.action)||!output.target_id) return false;
+  return true;
+}
+
+// ==== RENDER CARDS ====
+function renderCards(){
+  const stack=document.getElementById("cardStack");
+  stack.innerHTML="";
+  for(let i=agents.length-1;i>=0;i--){
+    const card=document.createElement("div");
+    card.className="profile-card";
+    card.innerHTML=`
+      <div class="holo-avatar"></div>
+      <h2 class="text-xl mb-2">${agents[i].name}</h2>
+      <div>${agents[i].traits.map(t=>`<span class="trait-tag">${t}</span>`).join('')}</div>
+    `;
+    stack.appendChild(card);
+  }
+}
+renderCards();
+
+// ==== PERFORM ACTION ====
+function performAction(output,sourceAgent){
+  const targetAgent=agents.find(a=>a.id===output.target_id);
+  if(!targetAgent) return;
+
+  sourceAgent.memory.push({action:output.action,target_id:targetAgent.id});
+
+  // if match
+  if(output.action==="SWIPE_RIGHT" || output.action==="SUPER_CONNECT"){
+    if(targetAgent.memory.find(m=>m.action==="SWIPE_RIGHT" && m.target_id===sourceAgent.id)){
+      // Match happened
+      showMatch(sourceAgent,targetAgent);
+    }
+  }
+}
+
+// ==== SHOW MATCH + SIMULATED CONVERSATION ====
+function showMatch(a1,a2){
+  const modal=document.getElementById("matchModal");
+  const log=document.getElementById("conversationLog");
+  modal.style.display="flex";
+  log.innerHTML="";
+  // simulate conversation
+  const conversation=[
+    `${a1.name}: Hi ${a2.name}, your traits are fascinating!`,
+    `${a2.name}: Thanks ${a1.name}, I like your energy too!`,
+    `${a1.name}: Shall we connect more?`,
+    `${a2.name}: Absolutely! 💖`
+  ];
+  conversation.forEach((msg,i)=>{
+    setTimeout(()=>{log.innerHTML+=msg+"<br>";},i*1000);
+  });
+  setTimeout(()=>modal.style.display="none",conversation.length*1000+1000);
+}
+
+// ==== AUTONOMOUS LOOP ====
+function agentLoop(){
+  agents.forEach(agent=>{
+    const potentialMatches=agents.filter(a=>a.id!==agent.id);
+    let output=agent.decideAction(potentialMatches);
+    if(validateAgentOutput(output)) performAction(output,agent);
+  });
+}
+
+setInterval(agentLoop,5000);
+</script>
+</body>
+</html>
